@@ -7,12 +7,6 @@ from http import HTTPStatus
 
 from telegram import Update
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler
-from telegram.error import InvalidToken
-
-from database.db import Database, LiveryDB
-from bot.handlers import BotHandlers
-from livery.injection import LiveryInjector
-import requests
 
 # Configure logging
 logging.basicConfig(
@@ -20,6 +14,21 @@ logging.basicConfig(
     level=logging.INFO
 )
 logger = logging.getLogger(__name__)
+
+# Import local modules - fixed import paths
+try:
+    from database.db import Database, LiveryDB
+    from bot.handlers import BotHandlers
+    from livery.injection import LiveryInjector
+except ImportError:
+    # Fallback for Vercel serverless environment
+    import sys
+    sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+    from database.db import Database, LiveryDB
+    from bot.handlers import BotHandlers
+    from livery.injection import LiveryInjector
+
+import requests
 
 # Global variables
 app = None
@@ -100,23 +109,14 @@ async def load_liveries_to_cache(livery_db: LiveryDB):
     except Exception as e:
         logger.warning(f"Failed to cache liveries: {e}")
 
-async def handler(request: Any) -> Any:
-    """Vercel HTTP handler for webhook"""
+# Main Vercel handler
+async def handler_async(request_body: dict):
+    """Async handler for processing Telegram updates"""
     try:
         await initialize()
         
-        # Get request data
-        try:
-            data = await request.json()
-        except:
-            return {'statusCode': HTTPStatus.BAD_REQUEST, 'body': json.dumps({'error': 'Invalid JSON'})}
-        
         # Create update from webhook data
-        try:
-            update = Update.de_json(data, app.bot)
-        except Exception as e:
-            logger.error(f"Failed to create update: {e}")
-            return {'statusCode': HTTPStatus.BAD_REQUEST, 'body': json.dumps({'error': 'Invalid update'})}
+        update = Update.de_json(request_body, app.bot)
         
         # Process update
         await app.process_update(update)
@@ -127,12 +127,49 @@ async def handler(request: Any) -> Any:
         logger.error(f"Handler error: {e}")
         return {'statusCode': HTTPStatus.INTERNAL_SERVER_ERROR, 'body': json.dumps({'error': str(e)})}
 
+# Vercel serverless function handler
+def handler(request, context=None):
+    """
+    Main Vercel handler (synchronous wrapper)
+    This is what Vercel calls directly
+    """
+    import asyncio
+    
+    try:
+        # Get request body
+        if hasattr(request, 'get_json'):
+            data = request.get_json()
+        elif hasattr(request, 'json'):
+            data = request.json
+        else:
+            try:
+                import json
+                data = json.loads(request.body if hasattr(request, 'body') else request)
+            except:
+                return {
+                    'statusCode': HTTPStatus.BAD_REQUEST,
+                    'body': json.dumps({'error': 'Invalid JSON'})
+                }
+        
+        # Run async handler
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            result = loop.run_until_complete(handler_async(data))
+            return result
+        finally:
+            loop.close()
+    
+    except Exception as e:
+        logger.error(f"Handler wrapper error: {e}")
+        return {
+            'statusCode': HTTPStatus.INTERNAL_SERVER_ERROR,
+            'body': json.dumps({'error': str(e)})
+        }
+
 # For local testing
 if __name__ == "__main__":
     import asyncio
     
-    class MockRequest:
-        async def json(self):
-            return {}
-    
-    asyncio.run(handler(MockRequest()))
+    test_data = {}
+    asyncio.run(handler_async(test_data))
