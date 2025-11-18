@@ -8,6 +8,10 @@
   ],
   "routes": [
     {
+      "src": "/api/index.py",
+      "dest": "api/index.py"
+    },
+    {
       "src": "/(.*)",
       "dest": "api/index.py"
     }
@@ -17,11 +21,5 @@
       "memory": 1024,
       "maxDuration": 30
     }
-  },
-  "env": {
-    "DATABASE_URL": "@database_url",
-    "BOT_TOKEN": "@bot_token",
-    "ADMIN_IDS": "@admin_ids",
-    "LIVERIES_DB_URL": "@liveries_db_url"
   }
 }
