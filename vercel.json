@@ -1,7 +1,17 @@
 {
   "version": 2,
-  "buildCommand": "pip install -r requirements.txt",
-  "runtime": "python3.12",
+  "builds": [
+    {
+      "src": "api/index.py",
+      "use": "@vercel/python"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "api/index.py"
+    }
+  ],
   "functions": {
     "api/index.py": {
       "memory": 1024,
@@ -9,17 +19,9 @@
     }
   },
   "env": {
-    "DATABASE_URL": {
-      "description": "PostgreSQL connection URL from Neon"
-    },
-    "BOT_TOKEN": {
-      "description": "Telegram Bot Token from BotFather"
-    },
-    "ADMIN_IDS": {
-      "description": "Comma-separated Telegram admin IDs"
-    },
-    "LIVERIES_DB_URL": {
-      "description": "URL to liveries database JSON (optional)"
-    }
+    "DATABASE_URL": "@database_url",
+    "BOT_TOKEN": "@bot_token",
+    "ADMIN_IDS": "@admin_ids",
+    "LIVERIES_DB_URL": "@liveries_db_url"
   }
 }
