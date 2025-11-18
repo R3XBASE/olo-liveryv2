@@ -1,10 +1,20 @@
 # ==================== TELEGRAM BOT HANDLERS ====================
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ContextTypes, ConversationHandler
+from telegram.ext import ContextTypes
 from telegram.constants import ChatAction
-from database.db import Database, UserDB, ProductDB, TransactionDB, LiveryDB, InjectionDB, SettingsDB
-from livery.injection import LiveryInjector
+
+# Import database modules
+try:
+    from database.db import Database, UserDB, ProductDB, TransactionDB, LiveryDB, InjectionDB, SettingsDB
+    from livery.injection import LiveryInjector
+except ImportError:
+    import sys
+    import os
+    sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+    from database.db import Database, UserDB, ProductDB, TransactionDB, LiveryDB, InjectionDB, SettingsDB
+    from livery.injection import LiveryInjector
+
 from typing import Optional
 import asyncio
 
@@ -50,7 +60,7 @@ class BotHandlers:
         
         keyboard = [
             [InlineKeyboardButton("💰 My Balance", callback_data="balance")],
-            [InlineKeyboardButton("🚗 Browse Liveries", callback_data="browse_liveries")],
+            [InlineKeyboardButton("🎨 Browse Liveries", callback_data="browse_liveries")],
             [InlineKeyboardButton("💳 Buy Points", callback_data="buy_points")],
             [InlineKeyboardButton("👤 Profile", callback_data="profile")],
         ]
@@ -126,6 +136,19 @@ class BotHandlers:
             )
             await query.edit_message_text(text)
         
+        elif query.data == "back_main":
+            keyboard = [
+                [InlineKeyboardButton("💰 My Balance", callback_data="balance")],
+                [InlineKeyboardButton("🎨 Browse Liveries", callback_data="browse_liveries")],
+                [InlineKeyboardButton("💳 Buy Points", callback_data="buy_points")],
+                [InlineKeyboardButton("👤 Profile", callback_data="profile")],
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await query.edit_message_text(
+                "👋 Main Menu\n\nWhat would you like to do?",
+                reply_markup=reply_markup
+            )
+        
         elif query.data.startswith("car_"):
             car_code = query.data.split("_", 1)[1]
             await self.show_liveries(query, car_code)
@@ -189,7 +212,7 @@ class BotHandlers:
         for livery in liveries[:8]:  # Limit to 8 per page
             keyboard.append([
                 InlineKeyboardButton(
-                    f"🎨 {livery['livery_name'][:20]}",
+                    f"🎨 {livery['livery_name'][:30]}",
                     callback_data=f"livery_{livery['livery_id']}"
                 )
             ])
@@ -232,7 +255,7 @@ class BotHandlers:
             f"🎨 {livery['livery_name']}\n"
             f"🚗 {livery['car_name']}\n\n"
             f"💰 Cost: {injection_cost:,} points\n"
-            f"👤 Your Balance: {user_balance:,} points\n\n"
+            f"💵 Your Balance: {user_balance:,} points\n\n"
             f"{'✅ You have enough points!' if user_balance >= injection_cost else '❌ Insufficient points'}",
             reply_markup=reply_markup
         )
@@ -290,7 +313,7 @@ class BotHandlers:
                     f"✅ Injection Successful!\n\n"
                     f"🎨 {livery['livery_name']}\n"
                     f"💰 Points Used: {injection_cost:,}\n"
-                    f"👤 New Balance: {new_balance:,}"
+                    f"💵 New Balance: {new_balance:,}"
                 )
             else:
                 await self.injection_db.log_injection(
@@ -324,7 +347,7 @@ class BotHandlers:
         for product in products:
             keyboard.append([
                 InlineKeyboardButton(
-                    f"{product['name']} - Rp{product['price_idr']:,}",
+                    f"💎 {product['name']} - Rp{product['price_idr']:,}",
                     callback_data=f"buy_{product['id']}"
                 )
             ])
@@ -354,7 +377,7 @@ class BotHandlers:
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         await query.edit_message_text(
-            f"💳 Transaction Details\n\n"
+            f"🧾 Transaction Details\n\n"
             f"Package: {product['name']}\n"
             f"Points: {product['points']:,}\n"
             f"Amount: Rp{product['price_idr']:,}\n"
@@ -508,7 +531,7 @@ class BotHandlers:
             telegram_id = int(args[0])
             injections = await self.injection_db.get_user_injections(telegram_id, 10)
             
-            text = f"📊 Injection Log for User {telegram_id}\n\n"
+            text = f"📋 Injection Log for User {telegram_id}\n\n"
             
             if not injections:
                 text += "No injections found"
